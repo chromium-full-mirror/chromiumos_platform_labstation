@@ -29,7 +29,6 @@ def main():
     """_summary_"""
     args = parse_args(sys.argv[1:])
     if not args.servo_serial:
-        print("Must specify servo serial param. --servo_serial=<serial>")
         sys.exit(2)
     hub = plugable.USBHubCommandsPlugable()
     if cambrionix.USBHubCommandsCambrionix.is_hub_detected():

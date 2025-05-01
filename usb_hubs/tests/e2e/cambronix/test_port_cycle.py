@@ -29,8 +29,12 @@ class TestPortCycle:
 
             with pytest.raises(SystemExit) as pytest_wrapped_e:
                 main()
-            out, unused_err = capfd.readouterr()
-            assert ("Must specify servo serial param. --servo_serial=<serial>\n") == out
+            out, err = capfd.readouterr()
+            assert (
+                "usage: per_port_powercycle [-h] --servo_serial SERVO_SERIAL\n"
+                "                           [--downtime_secs DOWNTIME_SECS]\n"
+                "per_port_powercycle: error: the following arguments are required: --servo_serial\n"
+            ) == err
             assert SystemExit == pytest_wrapped_e.type
 
     def test_basic(self, monkeypatch, mock_host_with_one_cambrionix, capfd):

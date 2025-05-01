@@ -25,12 +25,12 @@ _logger = logging.getLogger("mock_cambrionix_host")
 
 
 class USBDevice:
-    servo_serial_number = None
-    vid = None
+    iSerialNumber = None
+    pid = None
 
-    def __init__(self, serial_number, vid):
-        self.servo_serial_number = serial_number
-        self.vid = vid
+    def __init__(self, serial_number, pid):
+        self.iSerialNumber = serial_number
+        self.pid = pid
 
 
 @pytest.fixture(scope="function")
@@ -117,16 +117,16 @@ def mock_cambrionix_host(class_mocker, mocker):
                 ]
 
             # pylint
-            def mock_serial_open(self, port, baudrate, timeout):
+            def mock_serial_open(self, port, baudrate, write_timeout, timeout):
                 if not os.path.basename(port) in self.usb_devices:
                     raise serial.SerialException(f"Device not found {port}.")
                 self.console = self.usb_devices[os.path.basename(port)]
                 return self.console
 
-            def mock_usbfind(self, vendor_id, find_all):
+            def mock_usbfind(self, idProduct, find_all):
                 results = []
                 for port, enabled in self.console.port_enabled_mapping.items():
-                    if enabled and self.port_device_mapping[port].vid == vendor_id:
+                    if enabled and self.port_device_mapping[port].pid == idProduct:
                         results.append(self.port_device_mapping[port])
                 return results
 

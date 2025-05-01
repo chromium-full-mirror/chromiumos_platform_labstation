@@ -26,6 +26,32 @@ from usb_hubs.cambrionix import console_lib
 SERVO_PIDS = [0x520B, 0x520D]
 
 
+def get_usb_serial(device, retry_count=2):
+    """Call into the usb stack to get serial number.
+
+    If the call to the USB stack fails retry up to
+    retry_count times.
+
+    Args:
+        device (USBDevice): Object representing the usb device.
+        retry_count (int, optional): max times to try to get the serial number.
+                                     Defaults to 2.
+    Returns:
+        string: Serial number string or None if not retrieved.
+    """
+    serial_number = None
+    retry = 0
+    while not serial_number and retry < retry_count:
+        try:
+            serial_number = usb.util.get_string(device, device.iSerialNumber)
+        except ValueError:
+            retry += 1
+            if retry < retry_count:
+                print(f"Failed to get serial number for device. Retry {retry}")
+                sleep(2)  # Give it a second for the usb stack to settle down.
+    return serial_number
+
+
 def get_all_servo_serial():
     """For each servo PID enumerate the USB devices and collect their serial number.
 
@@ -35,8 +61,8 @@ def get_all_servo_serial():
     serialnos = []
     for product in SERVO_PIDS:
         for device in list(usb.core.find(idProduct=product, find_all=True)):
-            serialnos.append(usb.util.get_string(device, device.iSerialNumber))
-    return serialnos
+            serialnos.append(get_usb_serial(device))
+    return list(filter(lambda x: x is not None, serialnos))
 
 
 def reset_all(hub):
