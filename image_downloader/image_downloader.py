@@ -13,12 +13,13 @@ import re
 import shutil
 import subprocess
 import sys
+from urllib.error import ContentTooShortError
 from urllib.error import URLError
 from urllib.request import urlopen
 
 import requests
 from requests.exceptions import RequestException
-from urllib.error import ContentTooShortError
+
 
 LOG_FORMAT = "%(levelname)s - %(filename)s:%(lineno)d:%(funcName)s : %(message)s"
 
@@ -155,15 +156,18 @@ class ImageDownloader:
         """Downloads the image file from the network to the USB device."""
 
         # Check the webserver is working by getting the first 100 bytes of the file.
+        # If the image path requests extraction use the archive instead.
         self._logger.debug("Testing webserver")
-        response = requests.head(self.image_path, timeout=900)
+        base_image_path = re.sub('\?file=.*$', '', self.image_path)
+        base_image_path = re.sub('/extract/', '/download/', base_image_path)
+        response = requests.head(base_image_path, timeout=900)
         response.raise_for_status()
         self._logger.debug("Test Headers %s" % response.headers)
         self._logger.debug("Webserver test pass")
 
         def progress_bar(block_num, block_size, total_size):
             """Displays a progress bar in the logs."""
-            if block_num and block_num % 1000 == 0:
+            if block_num and block_num % 10000 == 0:
                 self._logger.debug(
                     "Show progress Block Num %d Block Size %d  Total %d"
                     % (block_num, block_size, total_size)
@@ -197,7 +201,7 @@ class ImageDownloader:
             bs = 4096
 
         with contextlib.closing(
-            requests.get(self.image_path, timeout=900, stream=True)
+            requests.get(self.image_path, timeout=3000, stream=True)
         ) as resp:
             headers = resp.headers
             self._logger.debug("Block size %d", bs)
