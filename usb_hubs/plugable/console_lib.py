@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 
-import servo.utils.usb_hierarchy as uh
+from usb_hubs.common import usb_hierarchy as uh
 from usb_hubs.common import base
 
 
@@ -77,9 +77,9 @@ class USBHubCommandsPlugable(base.USBHubCommands):
         """
         # This list is used to find all servos on the system.
         vid_pid_list = [(SERVO_VID, None)]
-        devs = uh.Hierarchy.get_all_usb_device_sysfs_paths(vid_pid_list)
+        devs = uh.get_all_usb_device_sysfs_paths(vid_pid_list)
         for dev_path in devs:
-            dev_serial = uh.Hierarchy.serial_from_sysfs(dev_path)
+            dev_serial = uh.serial_from_sysfs(dev_path)
             if dev_serial == serial:
                 return dev_path
         return None
@@ -105,7 +105,7 @@ class USBHubCommandsPlugable(base.USBHubCommands):
         while time.time() < end:
             try:
                 # check devnum reset
-                if devnum == uh.Hierarchy.dev_num_from_sysfs(dev_path):
+                if devnum == uh.dev_num_from_sysfs(dev_path):
                     self.error(
                         "%r likely unsuccessful. devnum stayed the same.", action
                     )
@@ -206,8 +206,8 @@ class USBHubCommandsPlugable(base.USBHubCommands):
         if pid in PWR_CYCLE_PIDS:
             # For servo v4(p1), the dev_path points to the stm that's hanging on
             # an internal usb hub.
-            internal_hub = uh.Hierarchy.get_sysfs_parent_hub_stub(dev_path)
-            smart_hub_path = uh.Hierarchy.get_sysfs_parent_hub_stub(internal_hub)
+            internal_hub = uh.get_sysfs_parent_hub_stub(dev_path)
+            smart_hub_path = uh.get_sysfs_parent_hub_stub(internal_hub)
             if smart_hub_path:
                 # The internal hub is hanging on the smart hub's port. So the last
                 # index is the port number.
@@ -217,7 +217,7 @@ class USBHubCommandsPlugable(base.USBHubCommands):
                 # enumerated on usb3.
                 smart_hub_bus, unused_ = smart_hub.split("-")
                 busnum = int(smart_hub_bus)
-                busnum3 = uh.Hierarchy.complement_bus_num(busnum)
+                busnum3 = uh.complement_bus_num(busnum)
                 smart_hub3 = None
                 if busnum3:
                     smart_hub3 = "busnum3-smart_hub_port_path"
@@ -250,7 +250,7 @@ class USBHubCommandsPlugable(base.USBHubCommands):
         dev_path = self._usb_path(servo_serial_number)
         if not dev_path:
             self.error("Device with serial %r not found.", servo_serial_number)
-        pid = uh.Hierarchy.product_id_from_sysfs(dev_path)
+        pid = uh.product_id_from_sysfs(dev_path)
         if pid not in PWR_CYCLE_PIDS:
             self.error(
                 "pid: 0x%04x currently not supported for usb power cycling. "
@@ -259,7 +259,7 @@ class USBHubCommandsPlugable(base.USBHubCommands):
                 ", ".join("0x%04x" % p for p in PWR_CYCLE_PIDS),
             )
         # get devnum, and store it
-        devnum = uh.Hierarchy.dev_num_from_sysfs(dev_path)
+        devnum = uh.dev_num_from_sysfs(dev_path)
         # extract the hub and check whether it's on uhubctl
         hub, port, hub3 = self._get_hub_and_port(dev_path, pid)
 
