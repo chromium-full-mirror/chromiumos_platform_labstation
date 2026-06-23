@@ -30,3 +30,21 @@ class TestCheckUSBStick:
         downloader = ImageDownloader(INVALID_DRIVE, VALID_LOCAL_BIN)
         with pytest.raises(ImageDownloaderException) as pytest_wrapped_e:
             downloader._check_usb_stick()
+
+
+class TestIsPartitionOf:
+    def test_is_partition_of_sd_drive(self):
+        assert ImageDownloader._is_partition_of("/dev/sda", "/dev/sda") is True
+        assert ImageDownloader._is_partition_of("/dev/sda1", "/dev/sda") is True
+        assert ImageDownloader._is_partition_of("/dev/sda12", "/dev/sda") is True
+        assert ImageDownloader._is_partition_of("/dev/sdaa", "/dev/sda") is False
+        assert ImageDownloader._is_partition_of("/dev/sdaa1", "/dev/sda") is False
+        assert ImageDownloader._is_partition_of("/dev/sdb", "/dev/sda") is False
+
+    def test_is_partition_of_nvme_drive(self):
+        assert ImageDownloader._is_partition_of("/dev/nvme0n1", "/dev/nvme0n1") is True
+        assert ImageDownloader._is_partition_of("/dev/nvme0n1p1", "/dev/nvme0n1") is True
+        assert ImageDownloader._is_partition_of("/dev/nvme0n1p10", "/dev/nvme0n1") is True
+        assert ImageDownloader._is_partition_of("/dev/nvme0n10", "/dev/nvme0n1") is False
+        assert ImageDownloader._is_partition_of("/dev/nvme0n10p1", "/dev/nvme0n1") is False
+

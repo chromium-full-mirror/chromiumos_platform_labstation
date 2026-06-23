@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from urllib.error import ContentTooShortError
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -108,19 +109,92 @@ class ImageDownloader:
                     self._logger.error(errstr)
                     errormsgs.append(errstr)
 
-                self._logger.debug("Calling blockdev")
-                proc = subprocess.run(
-                    ["sudo", "blockdev", "--rereadpt", self.usb_dev],
-                    capture_output=True,
-                    text=True,
-                )
-                if proc.returncode:
-                    errstr = f"Blockdev failed: {proc.stderr}"
+                self._logger.debug("Calling blockdev with retries")
+                max_attempts = 5
+                for attempt in range(1, max_attempts + 1):
+                    subprocess.run(
+                        ["sudo", "udevadm", "settle"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    proc = subprocess.run(
+                        ["sudo", "blockdev", "--rereadpt", self.usb_dev],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if proc.returncode == 0:
+                        self._logger.debug(
+                            "Blockdev rereadpt succeeded on attempt %d",
+                            attempt,
+                        )
+                        break
+
+                    self._logger.warning(
+                        "Blockdev rereadpt attempt %d failed: %s",
+                        attempt,
+                        proc.stderr.strip(),
+                    )
+                    if attempt < max_attempts:
+                        self._unmount_usb_partitions()
+                        time.sleep(1)
+                else:
+                    errstr = f"Blockdev failed after {max_attempts} attempts: {proc.stderr.strip()}"
                     self._logger.error(errstr)
                     errormsgs.append(errstr)
 
         if errormsgs:
             raise ImageDownloaderException("\n".join(errormsgs))
+
+    @staticmethod
+    def _is_partition_of(device_path: str, target_dev: str) -> bool:
+        """Check if device_path is target_dev itself or a partition of target_dev.
+
+        Handles standard drives (e.g. /dev/sda -> /dev/sda1) and digit-ending
+        drives (e.g. /dev/nvme0n1 -> /dev/nvme0n1p1) while avoiding false positive
+        matches such as /dev/sdaa for /dev/sda or /dev/nvme0n10 for /dev/nvme0n1.
+        """
+        if not device_path.startswith(target_dev):
+            return False
+        remainder = device_path[len(target_dev):]
+        if not remainder:
+            return True
+        if target_dev[-1].isdigit():
+            return remainder.startswith("p") and remainder[1:].isdigit()
+        return remainder.isdigit()
+
+    def _unmount_usb_partitions(self):
+        """Unmount any active mounts associated with the USB device or its partitions."""
+        try:
+            if not os.path.exists("/proc/mounts"):
+                return
+            with open("/proc/mounts", "r") as f:
+                mounts = f.readlines()
+            for line in mounts:
+                parts = line.split()
+                if not parts:
+                    continue
+                device_path = parts[0]
+                mount_point = parts[1]
+                if self._is_partition_of(device_path, self.usb_dev):
+                    self._logger.info(
+                        "Unmounting busy partition %s from %s",
+                        device_path,
+                        mount_point,
+                    )
+                    umount_proc = subprocess.run(
+                        ["sudo", "umount", mount_point],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if umount_proc.returncode != 0:
+                        self._logger.warning(
+                            "Failed to unmount %s from %s: %s",
+                            device_path,
+                            mount_point,
+                            umount_proc.stderr.strip(),
+                        )
+        except Exception as e:
+            self._logger.warning("Error during partition unmount cleanup: %s", e)
 
     def _check_usb_stick(self):
         """Verify we have write access to the USB stick
