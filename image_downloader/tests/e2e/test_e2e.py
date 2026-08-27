@@ -36,6 +36,20 @@ class TestWorkingTransfers:
         mock_system()
         main(["-d", VALID_DRIVE, "-i", VALID_NETWORK_BIN])
 
+    def test_blockdev_failure_is_non_fatal(self, monkeypatch, mock_system):
+
+        mock_system()
+
+        def mock_subprocess_run(cmd, **kwargs):
+            if "blockdev" in cmd:
+                return subprocess.CompletedProcess(
+                    cmd, 1, stderr="ioctl error on BLKRRPART: Device or resource busy"
+                )
+            return subprocess.CompletedProcess(cmd, 0)
+
+        monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+        main(["-d", VALID_DRIVE, "-i", VALID_LOCAL_BIN])
+
 
 class TestFailedTransfers:
     def test_no_drive(self, monkeypatch, mock_system):

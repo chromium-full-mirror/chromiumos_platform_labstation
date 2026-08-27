@@ -138,9 +138,12 @@ class ImageDownloader:
                         self._unmount_usb_partitions()
                         time.sleep(1)
                 else:
-                    errstr = f"Blockdev failed after {max_attempts} attempts: {proc.stderr.strip()}"
-                    self._logger.error(errstr)
-                    errormsgs.append(errstr)
+                    self._logger.warning(
+                        "Blockdev rereadpt failed after %d attempts: %s"
+                        " (ignoring non-fatal error as data was synced)",
+                        max_attempts,
+                        proc.stderr.strip() if proc.stderr else proc.returncode,
+                    )
 
         if errormsgs:
             raise ImageDownloaderException("\n".join(errormsgs))
@@ -232,7 +235,7 @@ class ImageDownloader:
         # Check the webserver is working by getting the first 100 bytes of the file.
         # If the image path requests extraction use the archive instead.
         self._logger.debug("Testing webserver")
-        base_image_path = re.sub('\?file=.*$', '', self.image_path)
+        base_image_path = re.sub(r'\?file=.*$', '', self.image_path)
         base_image_path = re.sub('/extract/', '/download/', base_image_path)
         response = requests.head(base_image_path, timeout=900)
         response.raise_for_status()
